@@ -23,6 +23,7 @@ Oasisic Note Version Control 就是为这些时刻准备的。它不会把你的
 - 🧭 文件改名后历史不会丢，会额外记录“重命名”快照
 - 📁 每个文件通过稳定索引关联历史，默认存储在 `.versions`
 - 🧮 可配置每个文件最多保留多少个版本，默认 50
+- 🔢 自动快照独立上限，手动/重命名/恢复快照不受自动清理影响
 - 🟢🔴 GitHub 风格差异对比，支持左右、行内、上下文件三种布局
 - ↩️ 可以恢复到任意历史版本
 - 🛟 恢复操作本身也会创建新快照，方便再次回退
@@ -107,6 +108,7 @@ Settings -> Community plugins -> Oasisic Note Version Control
 | Version storage folder | 版本 JSON 文件存储位置，默认 `.versions` |
 | Auto snapshot on save | Markdown 文件变化时自动创建快照 |
 | Maximum versions per file | 每个文件最多保留多少个版本，默认 50 |
+| Max auto snapshots per file | 自动快照独立上限（默认 20）。手动/重命名/恢复快照不会被自动清理 |
 | Diff layout | 默认差异布局：左右对比、行内对比、上下文件 |
 
 ## 数据存储格式 💾
