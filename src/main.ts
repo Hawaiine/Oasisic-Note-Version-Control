@@ -350,7 +350,7 @@ export class VersionController {
         const raw = await this.app.vault.adapter.read(path);
         history = this.normalizeHistory(JSON.parse(raw), file.path);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to load version history", error);
       new Notice(translate(this.settings, "loadHistoryFailed", { name: file.basename }));
     }
@@ -592,7 +592,7 @@ export class VersionController {
           files: parsed.files && typeof parsed.files === "object" ? { ...parsed.files } : {}
         };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to load version history index", error);
     }
 
@@ -772,7 +772,7 @@ export class VersionController {
   }
 
   private buildLcsTable(oldLines: string[], newLines: string[]): number[][] {
-    const table = Array.from({ length: oldLines.length + 1 }, () => Array(newLines.length + 1).fill(0));
+    const table: number[][] = Array.from({ length: oldLines.length + 1 }, () => Array(newLines.length + 1).fill(0));
 
     for (let oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
       for (let newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
@@ -902,16 +902,16 @@ function renderTimelineItem(
   const actions = body.createDiv("gsvc-version-actions");
   actions.createEl("button", { text: t("view") }).addEventListener("click", (event) => {
     event.stopPropagation();
-    onView();
+    void onView();
   });
   if (onRevert) {
     actions.createEl("button", { text: t("revert") }).addEventListener("click", (event) => {
       event.stopPropagation();
-      onRevert();
+      void onRevert();
     });
   }
 
-  item.addEventListener("click", onView);
+  item.addEventListener("click", () => { void onView(); });
 }
 
 function formatDate(timestamp: number): string {
@@ -951,14 +951,16 @@ class ConfirmRevertModal extends Modal {
       text: translate(this.settings, "revert"),
       cls: "mod-warning"
     });
-    confirmButton.addEventListener("click", async () => {
-      if (this.confirmed) {
-        return;
-      }
-      this.confirmed = true;
-      confirmButton.setText(translate(this.settings, "reverting"));
-      await this.onConfirm();
-      this.close();
+    confirmButton.addEventListener("click", () => {
+      void (async () => {
+        if (this.confirmed) {
+          return;
+        }
+        this.confirmed = true;
+        confirmButton.setText(translate(this.settings, "reverting"));
+        await this.onConfirm();
+        this.close();
+      })();
     });
   }
 }
@@ -1051,16 +1053,18 @@ export class VersionControlView extends ItemView {
 
     const actions = header.createDiv("gsvc-header-actions");
     const snapshotButton = actions.createEl("button", { cls: "gsvc-primary", text: this.plugin.t("snapshot") });
-    snapshotButton.addEventListener("click", async () => {
-      const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
-      if (message === null || !this.currentFile) {
-        return;
-      }
-      const version = await this.plugin.controller.commit(this.currentFile, message);
-      if (version) {
-        new Notice(this.plugin.t("createdSnapshot", { id: version.id }));
-      }
-      await this.refresh();
+    snapshotButton.addEventListener("click", () => {
+      void (async () => {
+        const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
+        if (message === null || !this.currentFile) {
+          return;
+        }
+        const version = await this.plugin.controller.commit(this.currentFile, message);
+        if (version) {
+          new Notice(this.plugin.t("createdSnapshot", { id: version.id }));
+        }
+        await this.refresh();
+      })();
     });
 
     actions.createEl("span", {
@@ -1168,10 +1172,12 @@ export class VersionControlView extends ItemView {
         text: this.plugin.t(mode === "split" ? "diffModeSplit" : mode === "inline" ? "diffModeInline" : "diffModeStacked"),
         cls: this.plugin.settings.diffViewMode === mode ? "is-active" : ""
       });
-      button.addEventListener("click", async () => {
-        this.plugin.settings.diffViewMode = mode;
-        await this.plugin.saveSettings();
-        await this.render();
+      button.addEventListener("click", () => {
+        void (async () => {
+          this.plugin.settings.diffViewMode = mode;
+          await this.plugin.saveSettings();
+          await this.render();
+        })();
       });
     });
     if (diff.length > 50) {
@@ -1253,13 +1259,15 @@ class VersionControlModal extends Modal {
     const currentStats = this.plugin.controller.getWordStats(await this.app.vault.read(this.file));
     actions.createEl("span", { cls: "gsvc-counter", text: `${this.plugin.t("wordStats")} ${currentStats.words}` });
     const snapshot = actions.createEl("button", { cls: "gsvc-primary", text: this.plugin.t("snapshot") });
-    snapshot.addEventListener("click", async () => {
-      const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
-      if (message === null) {
-        return;
-      }
-      await this.plugin.controller.commit(this.file, message);
-      await this.refresh();
+    snapshot.addEventListener("click", () => {
+      void (async () => {
+        const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
+        if (message === null) {
+          return;
+        }
+        await this.plugin.controller.commit(this.file, message);
+        await this.refresh();
+      })();
     });
 
     const split = shell.createDiv("gsvc-split");
@@ -1350,10 +1358,12 @@ class VersionControlModal extends Modal {
           text: this.plugin.t(mode === "split" ? "diffModeSplit" : mode === "inline" ? "diffModeInline" : "diffModeStacked"),
           cls: this.plugin.settings.diffViewMode === mode ? "is-active" : ""
         });
-        button.addEventListener("click", async () => {
-          this.plugin.settings.diffViewMode = mode;
-          await this.plugin.saveSettings();
-          await this.render();
+        button.addEventListener("click", () => {
+          void (async () => {
+            this.plugin.settings.diffViewMode = mode;
+            await this.plugin.saveSettings();
+            await this.render();
+          })();
         });
       });
       const fileHeader = diffBlock.createDiv("gsvc-diff-file-header");
@@ -1406,7 +1416,7 @@ export default class VersionControlPlugin extends Plugin {
           return false;
         }
         if (!checking) {
-          this.createSnapshotForFile(file);
+          void this.createSnapshotForFile(file);
         }
         return true;
       }
@@ -1442,7 +1452,7 @@ export default class VersionControlPlugin extends Plugin {
                 await view.refresh();
               }
             }
-          } catch (error) {
+          } catch (error: unknown) {
             console.error("Auto snapshot failed", error);
             new Notice(this.t("autoSnapshotFailed"));
           }
@@ -1464,7 +1474,7 @@ export default class VersionControlPlugin extends Plugin {
           if (version) {
             await this.getView()?.refresh();
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error("Rename snapshot failed", error);
         }
       })
@@ -1501,7 +1511,7 @@ export default class VersionControlPlugin extends Plugin {
 
   async activateView(): Promise<void> {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_VERSION_CONTROL);
-    const leaf = leaves[0] ?? this.app.workspace.getRightLeaf(false);
+    const leaf = leaves[0] ?? this.app.workspace.getLeaf(false);
     if (!leaf) {
       new Notice(this.t("openFailed"));
       return;
@@ -1533,7 +1543,7 @@ export default class VersionControlPlugin extends Plugin {
         new Notice(this.t("createdSnapshot", { id: version.id }));
         await this.getView()?.refresh();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Snapshot failed", error);
       new Notice(this.t("snapshotFailed"));
     }
