@@ -239,371 +239,63 @@ npm run build
 
 ## 提交到 Obsidian 插件市场 🌍
 
-如果你想让它像正常社区插件一样出现在 Obsidian 插件市场，需要向官方仓库提交一次 PR。
+自 2026 年 5 月起，Obsidian 使用了全新的 [community.obsidian.md](https://community.obsidian.md/) 社区网站来管理插件提交，旧版的 `obsidian-releases` PR 流程已正式废弃。新流程更快、更简单，且每个版本都会自动审核。
 
-官方仓库：
+### 首次提交
 
-```text
-https://github.com/obsidianmd/obsidian-releases
-```
+1. **确认仓库结构** — 确保根目录有 `manifest.json`、`README.md`、`LICENSE`、`styles.css`、`.github/workflows/release.yml`
+2. **创建 GitHub Release** — 推送 tag（如 `0.3.0`），触发 Actions 自动构建。Release 附件必须有 `manifest.json`、`main.js`、`styles.css`
+3. **登录社区网站** — 打开 [community.obsidian.md](https://community.obsidian.md/)，用 Obsidian 账号登录
+4. **关联 GitHub** — 在个人设置中关联你的 GitHub 账号
+5. **提交插件** — 左侧栏 → **Plugins** → **New plugin**，填入仓库 URL（`https://github.com/Hawaiine/oasisic-note-version-control`）
+6. **同意政策** — 阅读并同意 [Developer Policies](https://docs.obsidian.md/Developer+policies)
+7. **等待审核** — 自动审核通常在几分钟内完成；通过后 24 小时内可在插件市场中搜索到
 
-首次通过审核后，后续新版本只需要在你自己的插件仓库发 GitHub Release，不需要每次都向 `obsidian-releases` 提 PR。
+### 后续更新
 
-### 1. 准备自己的公开仓库
+之后只需要在你的 GitHub 仓库推送新 tag 即可，每次 Release 都会自动触发审核，无需再次提交。
 
-例如：
+### 审核失败怎么办
 
-```text
-https://github.com/Hawaiine/oasisic-note-version-control
-```
+登录 [community.obsidian.md](https://community.obsidian.md/) 查看详细的自动检查结果。根据报错修复代码后，推送新版本重新提交。你也可以在开发时使用官方 [eslint 插件](https://github.com/obsidianmd/eslint-plugin) 在本地提前检查。
 
-确保仓库根目录至少有：
+### 发布后
 
-```text
-manifest.json
-versions.json
-README.md
-LICENSE
-styles.css
-package.json
-src/
-.github/workflows/release.yml
-```
+- 在 [官方论坛 Share & showcase](https://forum.obsidian.md/c/share-showcase/9) 版块发帖
+- 在 [Obsidian Discord](https://discord.gg/veuWUTm) 的 `#updates` 频道发公告（需要 `developer` 角色）
 
-也要确认 `manifest.json` 里的信息是最新的：
+### Release 附件缺失
 
-```json
-{
-  "id": "oasisic-note-version-control",
-  "name": "Oasisic Note Version Control",
-  "version": "0.1.0",
-  "minAppVersion": "0.15.0",
-  "author": "Hawaiine"
-}
-```
+如果自动审核提示 Release 缺少 `main.js` 或 `manifest.json`，请确认：
 
-### 2. 确认 Release 附件
+1. `.github/workflows/release.yml` 存在且正确
+2. 推送的 tag 与 `manifest.json` 中的 `version` 完全一致（如 `0.3.0`，不加 `v` 前缀）
+3. 等待 GitHub Actions 构建完成后，检查 Release Assets 是否包含 `manifest.json`、`main.js`、`styles.css`
 
-进入你的 GitHub Release 页面，确认 `0.1.0` Release 里有：
-
-```text
-manifest.json
-main.js
-styles.css
-```
-
-特别注意：`main.js` 必须是 Release 附件。只把源码放在仓库里是不够的。
-
-### 3. 修改 `community-plugins.json`
-
-打开 `obsidianmd/obsidian-releases` 仓库里的 `community-plugins.json`。
-
-你可以直接在 GitHub 网页操作：
-
-1. 点击文件右上角的编辑按钮。
-2. GitHub 会自动 fork 官方仓库到你的账号下。
-3. 滚动到 JSON 数组最末尾。
-4. 找到当前最后一个插件条目。
-5. 在当前最后一个插件条目的 `}` 后面加一个逗号。
-6. 把你的插件信息放在它后面，作为新的最后一项。
-7. 确认你的条目后面没有多余逗号，因为 JSON 数组最后一项后面不能有逗号。
-
-非常重要：新增条目必须放在整个 `community-plugins.json` 的最后。如果 bot 提示：
-
-```text
-The last plugin in the list is: santiyounger/wpm-reading-time.
-```
-
-那就说明官方当前列表最后一项是 `santiyounger/wpm-reading-time`，你的条目应该放在它后面，而不是插在中间或按字母顺序插入。
-
-推荐条目：
-
-```json
-{
-  "id": "oasisic-note-version-control",
-  "name": "Oasisic Note Version Control",
-  "author": "Hawaiine",
-  "description": "Git-style snapshots, history, diffs, and restore workflows for Markdown notes.",
-  "repo": "Hawaiine/oasisic-note-version-control"
-}
-```
-
-字段说明：
-
-- `id`：必须和 `manifest.json` 里的 `id` 完全一致。
-- `name`：插件市场里显示的名称。
-- `author`：作者名，这里是 `Hawaiine`。
-- `description`：一句话说明插件做什么，会用于搜索。
-- `repo`：GitHub 仓库路径，不要带 `https://github.com/`。
-
-### 4. 创建 PR
-
-提交修改时：
-
-1. 点击 `Commit changes...`。
-2. 选择 `Propose changes`。
-3. 点击 `Create pull request`。
-4. 进入 PR 页面后，先切到 `Preview`。
-5. 选择 `Community Plugin` 模板。
-6. PR 标题建议写：
-
-   ```text
-   Add plugin: Oasisic Note Version Control
-   ```
-
-7. PR 描述必须使用官方 `Community Plugin` 模板。
-8. 按模板填写说明，并把已完成项目勾选成 `[x]`。
-9. 点击 `Create pull request`。
-
-可以直接复制下面这份模板，再按你的实际测试情况调整：
-
-```markdown
-# I am submitting a new Community Plugin
-
-- [x] I attest that I have done my best to deliver a high-quality plugin, am proud of the code I have written, and would recommend it to others. I commit to maintaining the plugin and being responsive to bug reports. If I am no longer able to maintain it, I will make reasonable efforts to find a successor maintainer or withdraw the plugin from the directory.
-
-## Repo URL
-
-Link to my plugin:
-https://github.com/Hawaiine/oasisic-note-version-control
-
-## Release Checklist
-- [x] I have tested the plugin on
-  - [x]  Windows
-  - [ ]  macOS
-  - [ ]  Linux
-  - [ ]  Android _(if applicable)_
-  - [ ]  iOS _(if applicable)_
-- [x] My GitHub release contains all required files (as individual files, not just in the source.zip / source.tar.gz)
-  - [x] `main.js`
-  - [x] `manifest.json`
-  - [x] `styles.css` _(optional)_
-- [x] GitHub release name matches the exact version number specified in my manifest.json (_**Note:** Use the exact version number, don't include a prefix `v`_)
-- [x] The `id` in my `manifest.json` matches the `id` in the `community-plugins.json` file.
-- [x] My README.md describes the plugin's purpose and provides clear usage instructions.
-- [x] I have read the developer policies at https://docs.obsidian.md/Developer+policies, and have assessed my plugin's adherence to these policies.
-- [x] I have read the tips in https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines and have self-reviewed my plugin to avoid these common pitfalls.
-- [x] I have added a license in the LICENSE file.
-- [x] My project respects and is compatible with the original license of any code from other plugins that I'm using.
-      I have given proper attribution to these other projects in my `README.md`.
-```
-
-如果你还没有测试 macOS / Linux / 移动端，不要随便勾选。只勾选你实际测试过的平台。已经确认 Release 附件存在、README 清楚、LICENSE 存在的项目可以勾选。
-
-### 5. 等待自动校验和人工审核
-
-提交 PR 后，Obsidian 的 bot 会先做自动检查。
-
-常见状态：
-
-- `Ready for review`：自动校验通过，可以等待人工审核。
-- `Validation failed`：自动校验失败，需要根据 bot 留言修复问题。
-- `Changes requested`：审核者要求修改。
-- `Additional review required`：还需要进一步审核。
-
-如果 GitHub 提示你的 PR 和主分支有冲突，官方文档建议先不要自己 merge 或 rebase。等插件通过审核后，Obsidian 团队会在发布前处理冲突。
-
-## 常见审核报错 🧯
-
-### 没有按 PR 模板填写
-
-报错类似：
-
-```text
-❌ You did not follow the pull request template.
-```
-
-处理方式：
-
-1. 打开你的 PR。
-2. 点击右上角 `Edit`。
-3. 打开官方模板文件：
-
-   ```text
-   https://github.com/obsidianmd/obsidian-releases/blob/master/.github/PULL_REQUEST_TEMPLATE/plugin.md
-   ```
-
-4. 复制模板内容到你的 PR 描述里。
-5. 按模板逐项填写插件信息。
-6. 把已经完成的检查项从 `[ ]` 改成 `[x]`。
-7. 点击 `Update comment` 保存。
-8. 回到 PR 页面，确认描述里能看到完整模板，而不是只有一句简单说明。
-
-可以用上面“创建 PR”一节里的模板。注意不要只写一句“Add plugin”，bot 会认为没有遵循模板。
-
-### 新增条目不在列表末尾
-
-报错类似：
-
-```text
-❌ The newly added entry is not at the end, or you are submitting on someone else's behalf. The last plugin in the list is: santiyounger/wpm-reading-time.
-```
-
-处理方式：
-
-1. 打开你的 PR。
-2. 点击 `Files changed`。
-3. 找到 `community-plugins.json`。
-4. 确认你的插件条目是不是整个 JSON 数组的最后一项。
-5. 如果不是，点击右上角 `...`，选择 `Edit file`。
-6. 剪切你的插件条目。
-7. 滚动到文件最底部。
-8. 找到 bot 提到的当前最后一个插件，例如：
-
-   ```json
-   {
-     "id": "wpm-reading-time",
-     "name": "...",
-     "author": "...",
-     "description": "...",
-     "repo": "santiyounger/wpm-reading-time"
-   }
-   ```
-
-9. 在这个最后条目的 `}` 后面加逗号。
-10. 把你的插件条目粘贴到它后面。
-11. 确认你的插件条目是数组最后一个元素，后面只剩下结束的 `]`。
-12. 确认你的插件条目最后没有逗号。
-13. 提交修改到同一个 PR 分支。
-
-如果你是用 GitHub 组织账号提交，还要确认你是该组织的 public member。否则 bot 可能认为你是在替别人提交插件。你的情况如果仓库是 `Hawaiine/oasisic-note-version-control`，最好用 `Hawaiine` 这个账号提交 PR。
-
-### Release 缺少 `main.js`
-
-报错类似：
-
-```text
-❌ The release 0.1.0 specified in the manifest.json in the root of the repo is missing the main.js file.
-```
-
-处理方式：
-
-如果你没有本地 npm 环境，推荐直接用 GitHub Actions 修复：
-
-1. 确认你的插件仓库里已经有这个文件：
-
-   ```text
-   .github/workflows/release.yml
-   ```
-
-2. 确认 `manifest.json` 里的版本号是当前要发布的版本，例如：
-
-   ```json
-   {
-     "version": "0.1.0"
-   }
-   ```
-
-3. 打开你的插件仓库，例如：
-
-   ```text
-   https://github.com/Hawaiine/oasisic-note-version-control
-   ```
-
-4. 点击仓库顶部的 `Actions`。
-5. 左侧选择 `Release Obsidian Plugin`。
-6. 点击右侧的 `Run workflow`。
-7. 在 `version` 输入框里填写：
-
-   ```text
-   0.1.0
-   ```
-
-8. 点击绿色的 `Run workflow` 按钮。
-9. 等待 workflow 跑完，状态应该变成绿色对勾。
-10. 打开仓库右侧或顶部的 `Releases`。
-11. 进入 `0.1.0` 这个 Release。
-12. 检查 `Assets` 附件里是否有这三个文件：
-
-    ```text
-    manifest.json
-    main.js
-    styles.css
-    ```
-
-13. 如果能看到 `main.js`，这个报错就修好了。
-14. 回到 Obsidian 插件提交 PR，留言说明你已经重新生成并上传 Release 附件。
-
-如果你更习惯用 tag 触发，也可以这样做：
-
-```bash
-git tag 0.1.0
-git push origin 0.1.0
-```
-
-注意：`main.js` 必须出现在 GitHub Release 的 `Assets` 附件里。只把 `main.js` 放在仓库根目录，Obsidian 的校验仍然可能认为缺失。
+也可以直接在 GitHub Actions 页面手动运行 `Release Obsidian Plugin` workflow，输入版本号触发构建。
 
 ### 仓库缺少 LICENSE
 
-报错类似：
-
-```text
-❌ Your repository does not include a license.
-```
-
-处理方式：
-
-1. 打开你的插件仓库。
-2. 确认仓库根目录有 `LICENSE` 文件。
-3. 如果没有，点击 GitHub 网页里的 `Add file`。
-4. 选择 `Create new file`。
-5. 文件名填写：
-
-   ```text
-   LICENSE
-   ```
-
-6. 粘贴 MIT License 内容，或者使用 GitHub 提供的 license picker。
-7. 提交到默认分支。
-8. 回到仓库根目录，确认 `LICENSE` 和 `README.md`、`manifest.json` 在同一级。
-
-当前项目已经使用 MIT License。
-
-修完后，可以在 PR 里回复：
-
-```text
-Thanks for the check. I updated the PR template, added LICENSE, and uploaded main.js to the 0.1.0 release.
-```
+确保仓库根目录有 `LICENSE` 文件。本项目已使用 MIT License。
 
 ## 后续发新版本 🎉
 
-审核通过后，之后发新版本只需要维护自己的插件仓库。
+审核通过后，之后发新版本只需要维护自己的插件仓库：
 
-流程：
-
-1. 修改代码和 README。
-2. 更新 `manifest.json` 里的 `version`，例如从 `0.1.0` 改成 `0.1.1`。
-3. 如果最低 Obsidian 版本没变，`versions.json` 可以不动；如果变了，就补上新版本映射：
-
-   ```json
-   {
-     "0.1.0": "0.15.0",
-     "0.1.1": "1.5.0"
-   }
-   ```
-
-4. 把改动 push 到 GitHub。
-5. 创建同版本号 tag，例如：
+1. 修改代码和 README
+2. 更新 `manifest.json` 里的 `version`（如 `0.3.0` → `0.3.1`）
+3. 如果 `minAppVersion` 没变，`versions.json` 不用动；变了就补上新映射
+4. 推送改动并创建同版本号 tag：
 
    ```bash
-   git tag 0.1.1
-   git push origin 0.1.1
+   git add -A && git commit -m "你的提交说明"
+   git tag 0.3.1 && git push origin main --tags
    ```
 
-6. 等 GitHub Actions 自动构建并生成 Release。
-7. 打开 `Releases -> 0.1.1 -> Assets`，确认有：
+5. 等待 GitHub Actions 自动构建 Release
+6. 确认 Release Assets 包含 `manifest.json`、`main.js`、`styles.css`
 
-   ```text
-   manifest.json
-   main.js
-   styles.css
-   ```
-
-8. 如果发现问题，修代码后删除错误的 tag / Release，再重新创建同版本 tag，或者把版本号递增到下一个补丁版本。
-
-Obsidian 会从你的 GitHub Release 读取新版本，不需要再次向 `obsidian-releases` 提 PR。
-
-一个简单原则：`manifest.json` 的 `version`、Git tag、GitHub Release 名称三者保持完全一致，不加 `v` 前缀。
+简单原则：`manifest.json` 的 `version`、Git tag、Release 名称三者完全一致，不加 `v` 前缀。
 
 ## English Quick Start 🌐
 
