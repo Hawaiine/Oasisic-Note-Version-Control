@@ -232,7 +232,7 @@ export class VersionController {
     this.cache.clear();
     // Clear debounce timers on settings change
     for (const timer of this.debounceTimers.values()) {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
     }
     this.debounceTimers.clear();
     this.restoredFileHashes.clear();
@@ -641,7 +641,6 @@ export class VersionController {
   }
 
   getWordStats(content: string): WordStats {
-    const trimmed = content.trim();
     const cjkMatches = content.match(/[\u4e00-\u9fff]/g) ?? [];
     const latinMatches = content.match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g) ?? [];
     return {
@@ -1229,7 +1228,7 @@ class VersionControlModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("gsvc-floating-modal");
-    void this.refresh();
+    this.refresh().catch(console.error);
   }
 
   private async refresh(): Promise<void> {
@@ -1431,7 +1430,7 @@ export default class VersionControlPlugin extends Plugin {
         // Debounce per file: cancel existing timer, set new one
         const existingTimer = this.controller["debounceTimers"].get(file.path);
         if (existingTimer) {
-          clearTimeout(existingTimer);
+          window.clearTimeout(existingTimer);
         }
         const timer = window.setTimeout(async () => {
           this.controller["debounceTimers"].delete(file.path);
@@ -1475,7 +1474,7 @@ export default class VersionControlPlugin extends Plugin {
   }
 
   onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_VERSION_CONTROL);
+    // Do NOT detach leaves — that resets user-placed leaf positions
   }
 
   async loadSettings(): Promise<void> {
@@ -1557,7 +1556,7 @@ class VersionControlSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: this.plugin.t("settingsTitle") });
+    new Setting(containerEl).setName(this.plugin.t("settingsTitle")).setHeading();
 
     new Setting(containerEl)
       .setName(this.plugin.t("language"))
