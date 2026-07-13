@@ -348,7 +348,7 @@ export class VersionController {
     try {
       if (await this.app.vault.adapter.exists(path)) {
         const raw = await this.app.vault.adapter.read(path);
-        history = this.normalizeHistory(JSON.parse(raw), file.path);
+        history = this.normalizeHistory(JSON.parse(raw) as Partial<FileHistory>, file.path);
       }
     } catch (error: unknown) {
       console.error("Failed to load version history", error);
@@ -772,7 +772,7 @@ export class VersionController {
   }
 
   private buildLcsTable(oldLines: string[], newLines: string[]): number[][] {
-    const table: number[][] = Array.from({ length: oldLines.length + 1 }, () => Array(newLines.length + 1).fill(0));
+    const table: number[][] = Array.from({ length: oldLines.length + 1 }, () => new Array<number>(newLines.length + 1).fill(0));
 
     for (let oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
       for (let newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
@@ -799,11 +799,11 @@ export class VersionController {
 
 function renderMeta(parent: HTMLElement, label: string, value: string): void {
   const item = parent.createDiv("gsvc-meta-item");
-  item.createEl("span", { text: label });
+  item.createSpan({ text: label });
   item.createEl("strong", { text: value });
 }
 
-function renderStats(parent: HTMLElement, diff: DiffLine[], t: (key: string, replacements?: Record<string, string | number>) => string): void {
+function renderStats(parent: HTMLElement, diff: DiffLine[], t: (...args: unknown[]) => string): void {
   const additions = diff.filter((line) => line.type === "added").length;
   const removals = diff.filter((line) => line.type === "removed").length;
   const stats = parent.createDiv("gsvc-stats");
@@ -813,11 +813,11 @@ function renderStats(parent: HTMLElement, diff: DiffLine[], t: (key: string, rep
 
 function renderDiffRow(parent: HTMLElement, line: DiffLine): void {
   const row = parent.createDiv(`gsvc-diff-line is-${line.type}`);
-  row.createEl("span", {
+  row.createSpan({
     cls: "gsvc-line-no",
     text: `${line.oldLine ?? ""}${line.oldLine && line.newLine ? " " : ""}${line.newLine ?? ""}`
   });
-  row.createEl("span", {
+  row.createSpan({
     cls: "gsvc-line-marker",
     text: line.type === "context" ? " " : line.type === "added" ? "+" : "-"
   });
@@ -828,7 +828,7 @@ function renderDiffByMode(
   parent: HTMLElement,
   lines: DiffLine[],
   mode: DiffViewMode,
-  t: (key: string, replacements?: Record<string, string | number>) => string
+  t: (...args: unknown[]) => string
 ): void {
   const diffEl = parent.createDiv(`gsvc-diff is-${mode}`);
 
@@ -869,9 +869,9 @@ function renderTimelineItem(
   version: Version,
   isSelected: boolean,
   isLatest: boolean,
-  t: (key: string, replacements?: Record<string, string | number>) => string,
-  onView: () => void,
-  onRevert: (() => void) | null
+  t: (...args: unknown[]) => string,
+  onView: () => void | Promise<void>,
+  onRevert: (() => void | Promise<void>) | null
 ): void {
   const item = list.createDiv({
     cls: `gsvc-version-item ${isSelected ? "is-selected" : ""}`
@@ -889,7 +889,7 @@ function renderTimelineItem(
     version.changeType === "manual" ? t("changedManual") :
     t("changedContent");
 
-  top.createEl("span", { cls: `gsvc-change-badge is-${version.changeType}`, text: changeLabel });
+  top.createSpan({ cls: `gsvc-change-badge is-${version.changeType}`, text: changeLabel });
   top.createEl("strong", { text: version.message });
   top.createEl("code", { text: version.id });
 
@@ -922,6 +922,48 @@ function formatDate(timestamp: number): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(timestamp));
+}
+
+class CommitMessageModal extends Modal {
+  constructor(
+    app: App,
+    private settings: VersionControlSettings,
+    private defaultValue: string,
+    private onSubmit: (value: string | null) => void | Promise<void>
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.addClass("gsvc-confirm-modal");
+    contentEl.createEl("h2", { text: translate(this.settings, "commitMessage") });
+    const input = contentEl.createEl("input", { type: "text", value: this.defaultValue });
+    input.addClass("gsvc-commit-input");
+    input.focus();
+    input.select();
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") { this.submit(input.value); }
+      if (evt.key === "Escape") { this.cancel(); }
+    });
+    const actions = contentEl.createDiv("gsvc-modal-actions");
+    actions.createEl("button", { text: translate(this.settings, "snapshot") }).addEventListener("click", () => this.submit(input.value));
+    actions.createEl("button", { text: translate(this.settings, "cancel") }).addEventListener("click", () => this.cancel());
+  }
+
+  private submit(value: string): void {
+    void this.onSubmit(value);
+    this.close();
+  }
+
+  private cancel(): void {
+    void this.onSubmit(null);
+    this.close();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
 }
 
 class ConfirmRevertModal extends Modal {
@@ -1019,7 +1061,7 @@ export class VersionControlView extends ItemView {
     const content = this.contentEl;
     content.empty();
     const empty = content.createDiv("gsvc-empty");
-    empty.createEl("div", { cls: "gsvc-empty-icon", text: "⌁" });
+    empty.createDiv({ cls: "gsvc-empty-icon", text: "⌁" });
     empty.createEl("h3", { text: this.plugin.t("noMarkdownTitle") });
     empty.createEl("p", { text: this.plugin.t("noMarkdownBody") });
   }
@@ -1047,15 +1089,14 @@ export class VersionControlView extends ItemView {
 
     const header = parent.createDiv("gsvc-header");
     const titleWrap = header.createDiv("gsvc-title-wrap");
-    titleWrap.createEl("div", { cls: "gsvc-eyebrow", text: this.plugin.t("currentNote") });
+    titleWrap.createDiv({ cls: "gsvc-eyebrow", text: this.plugin.t("currentNote") });
     titleWrap.createEl("h2", { text: this.currentFile.basename });
-    titleWrap.createEl("div", { cls: "gsvc-path", text: this.currentFile.path });
+    titleWrap.createDiv({ cls: "gsvc-path", text: this.currentFile.path });
 
     const actions = header.createDiv("gsvc-header-actions");
     const snapshotButton = actions.createEl("button", { cls: "gsvc-primary", text: this.plugin.t("snapshot") });
     snapshotButton.addEventListener("click", () => {
-      void (async () => {
-        const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
+      new CommitMessageModal(this.app, this.plugin.settings, this.plugin.t("manualSnapshot"), async (message) => {
         if (message === null || !this.currentFile) {
           return;
         }
@@ -1064,10 +1105,10 @@ export class VersionControlView extends ItemView {
           new Notice(this.plugin.t("createdSnapshot", { id: version.id }));
         }
         await this.refresh();
-      })();
+      }).open();
     });
 
-    actions.createEl("span", {
+    actions.createSpan({
       cls: "gsvc-counter",
       text: `${this.history.versions.length}/${this.plugin.settings.maxVersions}`
     });
@@ -1080,14 +1121,14 @@ export class VersionControlView extends ItemView {
 
     const timeline = parent.createDiv("gsvc-timeline");
     const timelineHeader = timeline.createDiv("gsvc-panel-heading");
-    timelineHeader.createEl("span", { text: this.plugin.t("timeline") });
+    timelineHeader.createSpan({ text: this.plugin.t("timeline") });
     timelineHeader.createEl("small", { text: this.plugin.t("newestFirst") });
 
     const list = timeline.createDiv("gsvc-version-list");
     if (this.history.versions.length === 0) {
       const blank = list.createDiv("gsvc-blank-list");
       blank.createEl("strong", { text: this.plugin.t("noSnapshots") });
-      blank.createEl("span", { text: this.plugin.t("noSnapshotsBody") });
+      blank.createSpan({ text: this.plugin.t("noSnapshotsBody") });
       return;
     }
 
@@ -1097,7 +1138,7 @@ export class VersionControlView extends ItemView {
         version,
         this.selectedVersion?.id === version.id,
         index === 0,
-        this.plugin.t.bind(this.plugin),
+        (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args),
         async () => {
           this.selectedVersion = version;
           await this.render();
@@ -1110,7 +1151,7 @@ export class VersionControlView extends ItemView {
   private async renderDetails(parent: HTMLElement): Promise<void> {
     const details = parent.createDiv("gsvc-details");
     const heading = details.createDiv("gsvc-panel-heading");
-    heading.createEl("span", { text: this.plugin.t("details") });
+    heading.createSpan({ text: this.plugin.t("details") });
 
     if (!this.currentFile || !this.history || !this.selectedVersion) {
       details.createDiv("gsvc-empty-details").setText(this.plugin.t("selectSnapshot"));
@@ -1134,12 +1175,12 @@ export class VersionControlView extends ItemView {
 
     if (largeFileSummary) {
       // Large file: show simplified stat view
-      renderStats(details, [], this.plugin.t.bind(this.plugin));
+      renderStats(details, [], (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
       const block = details.createDiv("gsvc-section");
       const title = block.createDiv("gsvc-section-title");
-      title.createEl("span", { text: this.plugin.t("diffTitle") });
+      title.createSpan({ text: this.plugin.t("diffTitle") });
       const fileHeader = block.createDiv("gsvc-diff-file-header");
-      fileHeader.createEl("span", { cls: "gsvc-file-icon", text: "MD" });
+      fileHeader.createSpan({ cls: "gsvc-file-icon", text: "MD" });
       fileHeader.createEl("strong", { text: this.selectedVersion.fileName });
       fileHeader.createEl("small", {
         text: this.plugin.t("largeFileDiffSummary", {
@@ -1152,7 +1193,7 @@ export class VersionControlView extends ItemView {
       notice.setText(this.plugin.t("largeFileDiffNotice"));
     } else {
       const diff = this.plugin.controller.getVersionDiff(this.selectedVersion.content, currentContent);
-      renderStats(details, diff, this.plugin.t.bind(this.plugin));
+      renderStats(details, diff, (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
       this.renderDiff(details, diff);
     }
     this.renderPreview(details, this.selectedVersion.content);
@@ -1165,7 +1206,7 @@ export class VersionControlView extends ItemView {
     const additions = diff.filter((line) => line.type === "added").length;
     const deletions = diff.filter((line) => line.type === "removed").length;
     const title = block.createDiv("gsvc-section-title");
-    title.createEl("span", { text: this.plugin.t("diffTitle") });
+    title.createSpan({ text: this.plugin.t("diffTitle") });
     const modeSwitch = title.createDiv("gsvc-diff-modes");
     (["split", "inline", "stacked"] as DiffViewMode[]).forEach((mode) => {
       const button = modeSwitch.createEl("button", {
@@ -1185,11 +1226,11 @@ export class VersionControlView extends ItemView {
     }
 
     const fileHeader = block.createDiv("gsvc-diff-file-header");
-    fileHeader.createEl("span", { cls: "gsvc-file-icon", text: "MD" });
+    fileHeader.createSpan({ cls: "gsvc-file-icon", text: "MD" });
     fileHeader.createEl("strong", { text: this.selectedVersion?.fileName ?? this.plugin.t("diffFileHeader") });
     fileHeader.createEl("small", { text: this.plugin.t("linesChanged", { additions, deletions }) });
 
-    renderDiffByMode(block, diff.slice(0, 50), this.plugin.settings.diffViewMode, this.plugin.t.bind(this.plugin));
+    renderDiffByMode(block, diff.slice(0, 50), this.plugin.settings.diffViewMode, (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
   }
 
   // --- Content preview ---
@@ -1197,7 +1238,7 @@ export class VersionControlView extends ItemView {
   private renderPreview(parent: HTMLElement, content: string): void {
     const block = parent.createDiv("gsvc-section");
     const title = block.createDiv("gsvc-section-title");
-    title.createEl("span", { text: this.plugin.t("preview") });
+    title.createSpan({ text: this.plugin.t("preview") });
     title.createEl("small", { text: this.plugin.t("snapshotBody") });
     block.createEl("pre", { cls: "gsvc-preview", text: content.slice(0, 8000) || this.plugin.t("emptyFile") });
   }
@@ -1251,23 +1292,22 @@ class VersionControlModal extends Modal {
     const shell = this.contentEl.createDiv("gsvc-shell gsvc-modal-shell");
     const header = shell.createDiv("gsvc-header");
     const title = header.createDiv("gsvc-title-wrap");
-    title.createEl("div", { cls: "gsvc-eyebrow", text: this.plugin.t("currentNote") });
+    title.createDiv({ cls: "gsvc-eyebrow", text: this.plugin.t("currentNote") });
     title.createEl("h2", { text: this.file.basename });
-    title.createEl("div", { cls: "gsvc-path", text: this.file.path });
+    title.createDiv({ cls: "gsvc-path", text: this.file.path });
 
     const actions = header.createDiv("gsvc-header-actions");
     const currentStats = this.plugin.controller.getWordStats(await this.app.vault.read(this.file));
-    actions.createEl("span", { cls: "gsvc-counter", text: `${this.plugin.t("wordStats")} ${currentStats.words}` });
+    actions.createSpan({ cls: "gsvc-counter", text: `${this.plugin.t("wordStats")} ${currentStats.words}` });
     const snapshot = actions.createEl("button", { cls: "gsvc-primary", text: this.plugin.t("snapshot") });
     snapshot.addEventListener("click", () => {
-      void (async () => {
-        const message = window.prompt(this.plugin.t("commitMessage"), this.plugin.t("manualSnapshot"));
+      new CommitMessageModal(this.app, this.plugin.settings, this.plugin.t("manualSnapshot"), async (message) => {
         if (message === null) {
           return;
         }
         await this.plugin.controller.commit(this.file, message);
         await this.refresh();
-      })();
+      }).open();
     });
 
     const split = shell.createDiv("gsvc-split");
@@ -1278,7 +1318,7 @@ class VersionControlModal extends Modal {
   private renderTimeline(parent: HTMLElement): void {
     const timeline = parent.createDiv("gsvc-timeline");
     const heading = timeline.createDiv("gsvc-panel-heading");
-    heading.createEl("span", { text: this.plugin.t("timeline") });
+    heading.createSpan({ text: this.plugin.t("timeline") });
     heading.createEl("small", { text: this.plugin.t("newestFirst") });
     const list = timeline.createDiv("gsvc-version-list");
 
@@ -1293,7 +1333,7 @@ class VersionControlModal extends Modal {
         version,
         this.selectedVersion?.id === version.id,
         index === 0,
-        this.plugin.t.bind(this.plugin),
+        (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args),
         async () => {
           this.selectedVersion = version;
           await this.render();
@@ -1306,7 +1346,7 @@ class VersionControlModal extends Modal {
   private async renderDetails(parent: HTMLElement): Promise<void> {
     const details = parent.createDiv("gsvc-details");
     const heading = details.createDiv("gsvc-panel-heading");
-    heading.createEl("span", { text: this.plugin.t("details") });
+    heading.createSpan({ text: this.plugin.t("details") });
     if (!this.selectedVersion) {
       details.createDiv("gsvc-empty-details").setText(this.plugin.t("selectSnapshot"));
       return;
@@ -1330,12 +1370,12 @@ class VersionControlModal extends Modal {
     const largeFileSummary = this.plugin.controller.getLargeFileSummary(this.selectedVersion.content, currentContent);
 
     if (largeFileSummary) {
-      renderStats(details, [], this.plugin.t.bind(this.plugin));
+      renderStats(details, [], (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
       const diffBlock = details.createDiv("gsvc-section");
       const title = diffBlock.createDiv("gsvc-section-title");
-      title.createEl("span", { text: this.plugin.t("diffTitle") });
+      title.createSpan({ text: this.plugin.t("diffTitle") });
       const fileHeader = diffBlock.createDiv("gsvc-diff-file-header");
-      fileHeader.createEl("span", { cls: "gsvc-file-icon", text: "MD" });
+      fileHeader.createSpan({ cls: "gsvc-file-icon", text: "MD" });
       fileHeader.createEl("strong", { text: this.selectedVersion.fileName });
       fileHeader.createEl("small", {
         text: this.plugin.t("largeFileDiffSummary", {
@@ -1348,10 +1388,10 @@ class VersionControlModal extends Modal {
       notice.setText(this.plugin.t("largeFileDiffNotice"));
     } else {
       const diff = this.plugin.controller.getVersionDiff(this.selectedVersion.content, currentContent);
-      renderStats(details, diff, this.plugin.t.bind(this.plugin));
+      renderStats(details, diff, (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
       const diffBlock = details.createDiv("gsvc-section");
       const title = diffBlock.createDiv("gsvc-section-title");
-      title.createEl("span", { text: this.plugin.t("diffTitle") });
+      title.createSpan({ text: this.plugin.t("diffTitle") });
       const modeSwitch = title.createDiv("gsvc-diff-modes");
       (["split", "inline", "stacked"] as DiffViewMode[]).forEach((mode) => {
         const button = modeSwitch.createEl("button", {
@@ -1367,7 +1407,7 @@ class VersionControlModal extends Modal {
         });
       });
       const fileHeader = diffBlock.createDiv("gsvc-diff-file-header");
-      fileHeader.createEl("span", { cls: "gsvc-file-icon", text: "MD" });
+      fileHeader.createSpan({ cls: "gsvc-file-icon", text: "MD" });
       fileHeader.createEl("strong", { text: this.selectedVersion.fileName });
       fileHeader.createEl("small", {
         text: this.plugin.t("linesChanged", {
@@ -1375,7 +1415,7 @@ class VersionControlModal extends Modal {
           deletions: diff.filter((line) => line.type === "removed").length
         })
       });
-      renderDiffByMode(diffBlock, diff.slice(0, 50), this.plugin.settings.diffViewMode, this.plugin.t.bind(this.plugin));
+      renderDiffByMode(diffBlock, diff.slice(0, 50), this.plugin.settings.diffViewMode, (...args: Parameters<typeof this.plugin.t>) => this.plugin.t(...args));
     }
   }
 
@@ -1442,20 +1482,22 @@ export default class VersionControlPlugin extends Plugin {
         if (existingTimer) {
           window.clearTimeout(existingTimer);
         }
-        const timer = window.setTimeout(async () => {
-          this.controller["debounceTimers"].delete(file.path);
-          try {
-            const version = await this.controller.autoCommit(file);
-            if (version) {
-              const view = this.getView();
-              if (view) {
-                await view.refresh();
+        const timer = window.setTimeout(() => {
+          void (async () => {
+            this.controller["debounceTimers"].delete(file.path);
+            try {
+              const version = await this.controller.autoCommit(file);
+              if (version) {
+                const view = this.getView();
+                if (view) {
+                  await view.refresh();
+                }
               }
+            } catch (error: unknown) {
+              console.error("Auto snapshot failed", error);
+              new Notice(this.t("autoSnapshotFailed"));
             }
-          } catch (error: unknown) {
-            console.error("Auto snapshot failed", error);
-            new Notice(this.t("autoSnapshotFailed"));
-          }
+          })();
         }, this.controller["DEBOUNCE_MS"]);
         this.controller["debounceTimers"].set(file.path, timer);
       })
@@ -1488,10 +1530,8 @@ export default class VersionControlPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...(await this.loadData())
-    };
+    const stored = (await this.loadData()) as Partial<VersionControlSettings> | null;
+    this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
   }
 
   async saveSettings(): Promise<void> {
@@ -1518,7 +1558,7 @@ export default class VersionControlPlugin extends Plugin {
     }
 
     await leaf.setViewState({ type: VIEW_TYPE_VERSION_CONTROL, active: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
     await this.getView()?.setFile(this.getActiveMarkdownFile());
   }
 
@@ -1532,21 +1572,22 @@ export default class VersionControlPlugin extends Plugin {
   }
 
   private async createSnapshotForFile(file: TFile): Promise<void> {
-    const message = window.prompt(this.t("commitMessage"), this.t("manualSnapshot"));
-    if (message === null) {
-      return;
-    }
-
-    try {
-      const version = await this.controller.commit(file, message);
-      if (version) {
-        new Notice(this.t("createdSnapshot", { id: version.id }));
-        await this.getView()?.refresh();
+    new CommitMessageModal(this.app, this.settings, this.t("manualSnapshot"), async (message) => {
+      if (message === null) {
+        return;
       }
-    } catch (error: unknown) {
-      console.error("Snapshot failed", error);
-      new Notice(this.t("snapshotFailed"));
-    }
+
+      try {
+        const version = await this.controller.commit(file, message);
+        if (version) {
+          new Notice(this.t("createdSnapshot", { id: version.id }));
+          await this.getView()?.refresh();
+        }
+      } catch (error: unknown) {
+        console.error("Snapshot failed", error);
+        new Notice(this.t("snapshotFailed"));
+      }
+    }).open();
   }
 
   private getView(): VersionControlView | null {
